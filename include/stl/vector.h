@@ -34,7 +34,7 @@ public:
 
   // Forwarding reference to ensure our implementation accepts all value
   // categories
-  void push_back(T &&element) {
+  template <typename U> void push_back(U &&element) {
     // Classic dynamic resizing array implementation
     // Exceed capacity, then just allocate twice as much
     if (size_ == capacity_) {
@@ -42,7 +42,7 @@ public:
     }
 
     // Perfect forwarding
-    new (data_ + size_) T(std::forward<T>(element));
+    new (data_ + size_) T(std::forward<U>(element));
     size_++;
   }
 

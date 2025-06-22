@@ -1,6 +1,9 @@
 #define CATCH_CONFIG_MAIN
+#include <algorithm>
 #include <catch2/catch_test_macros.hpp>
 #include <string>
+#include <utility>
+#include <vector>
 
 #include "stl/vector.h"
 
@@ -159,4 +162,101 @@ TEST_CASE("push_back retains existing elements across reallocations",
   for (int i = 0; i < N; ++i) {
     REQUIRE(v[i] == i);
   }
+}
+
+// Helper to fill a vector<int> of given size with sequential values
+static Vector<int> make_seq(int n) {
+  Vector<int> v;
+  for (int i = 0; i < n; ++i) v.push_back(i);
+  return v;
+}
+
+TEST_CASE("copy constructor produces deep copy", "[vector][copy]") {
+  auto original = make_seq(10);
+  Vector<int> copy = original;
+
+  // Same size / capacity
+  REQUIRE(copy.size() == original.size());
+  REQUIRE(copy.capacity() == original.capacity());
+
+  // But different buffers (deep copy)
+  REQUIRE(&copy[0] != &original[0]);
+
+  // And contents match
+  for (size_t i = 0; i < original.size(); ++i) REQUIRE(copy[i] == original[i]);
+}
+
+TEST_CASE("copy assignment produces deep copy and handles self-assign",
+          "[vector][copy]") {
+  Vector<std::string> a;
+  a.push_back("one");
+  a.push_back("two");
+
+  Vector<std::string> b;
+  b = a;  // copy assign
+
+  REQUIRE(b.size() == 2);
+  REQUIRE(b[0] == "one");
+  REQUIRE(b[1] == "two");
+  REQUIRE(&b[0] != &a[0]);  // deep
+
+  // self-assign should be safe
+  REQUIRE_NOTHROW(a = std::move(a));
+  REQUIRE(a.size() == 2);
+  REQUIRE(a[1] == "two");
+}
+
+TEST_CASE("move constructor steals resources", "[vector][move]") {
+  auto source = make_seq(5);
+  int *source_data = &source[0];
+  size_t source_cap = source.capacity();
+  size_t source_size = source.size();
+
+  Vector<int> moved = std::move(source);
+
+  // moved has the old buffer & matching metadata
+  REQUIRE(moved.size() == source_size);
+  REQUIRE(moved.capacity() == source_cap);
+  REQUIRE(&moved[0] == source_data);
+
+  // source is left in a valid empty state
+  REQUIRE(source.size() == 0);
+  REQUIRE(source.capacity() == 0);
+}
+
+TEST_CASE("move assignment steals and leaves source empty", "[vector][move]") {
+  auto src = make_seq(7);
+  auto dst = make_seq(3);
+
+  int *src_data = &src[0];
+  size_t src_cap = src.capacity();
+  size_t src_size = src.size();
+
+  dst = std::move(src);
+
+  REQUIRE(dst.size() == src_size);
+  REQUIRE(dst.capacity() == src_cap);
+  REQUIRE(&dst[0] == src_data);
+
+  REQUIRE(src.size() == 0);
+  REQUIRE(src.capacity() == 0);
+}
+
+TEST_CASE("swap exchanges internals in O(1)", "[vector][swap]") {
+  auto v1 = make_seq(4);
+  auto v2 = make_seq(8);
+
+  int *d1 = &v1[0];
+  int *d2 = &v2[0];
+  size_t c1 = v1.capacity(), c2 = v2.capacity();
+
+  swap(v1, v2);
+
+  REQUIRE(v1.size() == 8);
+  REQUIRE(v1.capacity() == c2);
+  REQUIRE(&v1[0] == d2);
+
+  REQUIRE(v2.size() == 4);
+  REQUIRE(v2.capacity() == c1);
+  REQUIRE(&v2[0] == d1);
 }

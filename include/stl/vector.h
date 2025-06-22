@@ -5,6 +5,7 @@
 
 #pragma once
 
+#include <algorithm>
 #include <cstddef>
 #include <cstdlib>
 #include <utility>
@@ -26,6 +27,42 @@ class Vector {
   ~Vector() noexcept {
     for (size_t i = 0; i < size_; ++i) data_[i].~T();
     free(data_);
+  }
+
+  Vector(const Vector &other)
+      : data_(static_cast<T *>(malloc(sizeof(T) * other.capacity_))),
+        capacity_(other.capacity_),
+        size_(other.size_) {
+    std::copy(other.data_, other.data_ + size_, data_);
+  }
+
+  void swap(Vector &other) noexcept {
+    using std::swap;
+    swap(size_, other.size_);
+    swap(capacity_, other.capacity_);
+    swap(data_, other.data_);
+  }
+
+  friend void swap(Vector &lhs, Vector &rhs) noexcept { lhs.swap(rhs); }
+
+  Vector &operator=(const Vector &other) {
+    Vector copy(other);
+    copy.swap(*this);
+
+    return *this;
+  }
+
+  Vector(Vector &&other) noexcept {
+    capacity_ = std::exchange(other.capacity_, 0);
+    size_ = std::exchange(other.size_, 0);
+    data_ = std::exchange(other.data_, nullptr);
+  }
+
+  Vector &operator=(Vector &&other) noexcept {
+    Vector copy(std::move(other));
+    copy.swap(*this);
+
+    return *this;
   }
 
   [[nodiscard]] size_t size() const noexcept { return size_; }

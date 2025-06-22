@@ -6,6 +6,7 @@
 #pragma once
 
 #include <algorithm>
+#include <concepts>
 #include <cstddef>
 #include <cstdlib>
 #include <utility>
@@ -71,6 +72,7 @@ class Vector {
   // Forwarding reference to ensure our implementation accepts all value
   // categories
   template <typename U>
+    requires std::convertible_to<U &&, T>
   void push_back(U &&element) {
     // Classic dynamic resizing array implementation
     // Exceed capacity, then just allocate twice as much
@@ -80,6 +82,18 @@ class Vector {
 
     // Perfect forwarding
     new (data_ + size_) T(std::forward<U>(element));
+    size_++;
+  }
+
+  template <typename... Args>
+    requires std::constructible_from<T, Args &&...>
+  void emplace_back(Args &&...args) {
+    if (size_ == capacity_) {
+      reallocate(capacity_ == 0 ? 1 : 2 * capacity_);
+    }
+
+    new (data_ + size_) T(std::forward<Args>(args)...);
+
     size_++;
   }
 

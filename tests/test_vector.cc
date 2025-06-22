@@ -260,3 +260,60 @@ TEST_CASE("swap exchanges internals in O(1)", "[vector][swap]") {
   REQUIRE(v2.capacity() == c1);
   REQUIRE(&v2[0] == d1);
 }
+
+TEST_CASE("push_back only participates for convertible types",
+          "[vector][push_back][concepts]") {
+  stl::Vector<int> vi;
+
+  // int literal
+  vi.push_back(123);
+  REQUIRE(vi.size() == 1);
+  REQUIRE(vi[0] == 123);
+
+  // short is convertible to int
+  short s = 7;
+  vi.push_back(s);
+  REQUIRE(vi.size() == 2);
+  REQUIRE(vi[1] == 7);
+
+  // const int&
+  const int ci = 42;
+  vi.push_back(ci);
+  REQUIRE(vi.size() == 3);
+  REQUIRE(vi[2] == 42);
+
+  // The following line should *not* compile if uncommented:
+  //   std::string str = "oops";
+  //   vi.push_back(str);
+  //
+  // (This static check can’t run at test runtime, but you can verify by
+  // uncommenting.)
+}
+
+TEST_CASE("emplace_back only participates when T is constructible from Args",
+          "[vector][emplace_back]") {
+  stl::Vector<std::pair<int, std::string>> vp;
+
+  // Construct from (int, const char*)
+  vp.emplace_back(5, "five");
+  REQUIRE(vp.size() == 1);
+  auto &p = vp[0];
+  REQUIRE(p.first == 5);
+  REQUIRE(p.second == "five");
+
+  // Construct from lvalue string + rvalue int
+  std::string word = "ten";
+  vp.emplace_back(10, word);
+  REQUIRE(vp.size() == 2);
+  REQUIRE(vp[1].first == 10);
+  REQUIRE(vp[1].second == "ten");
+
+  // Move-only type with in-place emplace
+  stl::Vector<MoveOnly> vm;
+  vm.emplace_back();  // default-construct
+  REQUIRE(vm.size() == 1);
+
+  // The following line should fail to compile if uncommented:
+  //   stl::Vector<int> v_int;
+  //   v_int.emplace_back("not an int");
+}

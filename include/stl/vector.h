@@ -7,6 +7,7 @@
 
 #include <cstddef>
 #include <cstdlib>
+#include <iterator>
 #include <utility>
 
 namespace stl {
@@ -31,8 +32,38 @@ public:
   size_t size() const noexcept { return size_; }
   size_t capacity() const noexcept { return capacity_; }
 
+  // Forwarding reference to ensure our implementation accepts all value
+  // categories
+  void push_back(T &&element) {
+    // Classic dynamic resizing array implementation
+    // Exceed capacity, then just allocate twice as much
+    if (size_ == capacity_) {
+      reallocate(capacity_ == 0 ? 1 : 2 * capacity_);
+    }
+
+    // Perfect forwarding
+    new (data_ + size_) T(std::forward<T>(element));
+    size_++;
+  }
+
+  void pop_back() {
+    if (size_ == 0)
+      return;
+    // Destruct last element
+    data_[size_ - 1].~T();
+    size_--;
+
+    // Only reduce the size when current size is 1/4 of the capacity
+    if (size_ <= capacity_ / 4) {
+      reallocate(capacity_ / 2);
+    }
+  }
+
+  T &operator[](size_t index) noexcept { return data_[index]; }
+  const T &operator[](size_t index) const noexcept { return data_[index]; }
+
 private:
-  void Reallocate(size_t new_capacity) {
+  void reallocate(size_t new_capacity) {
     // Allocate new memory
     T *new_data = static_cast<T *>(malloc(sizeof(T) * new_capacity));
 

@@ -32,4 +32,3 @@ cd cpp-stl-from-scratch
 mkdir build && cd build
 cmake ..
 make
-./run_tests

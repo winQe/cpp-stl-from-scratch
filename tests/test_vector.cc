@@ -317,3 +317,28 @@ TEST_CASE("emplace_back only participates when T is constructible from Args",
   //   stl::Vector<int> v_int;
   //   v_int.emplace_back("not an int");
 }
+
+TEST_CASE("clear removes all elements", "[vector][clear]") {
+  stl::Vector<int> v;
+  v.push_back(1);
+  v.push_back(2);
+  v.push_back(3);
+
+  REQUIRE(v.size() == 3);
+  v.clear();
+  REQUIRE(v.size() == 0);
+  REQUIRE(v.begin() == v.end());
+}
+
+TEST_CASE("begin and end iterators", "[vector][iterator]") {
+  stl::Vector<int> v;
+  v.push_back(10);
+  v.push_back(20);
+  v.push_back(30);
+
+  int sum = 0;
+  for (int x : v) {
+    sum += x;
+  }
+  REQUIRE(sum == 60);
+}

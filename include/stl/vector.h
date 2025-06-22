@@ -68,6 +68,7 @@ class Vector {
 
   [[nodiscard]] size_t size() const noexcept { return size_; }
   [[nodiscard]] size_t capacity() const noexcept { return capacity_; }
+  [[nodiscard]] bool empty() const noexcept { return size_ == 0; }
 
   // Forwarding reference to ensure our implementation accepts all value
   // categories
@@ -111,6 +112,26 @@ class Vector {
 
   T &operator[](size_t index) noexcept { return data_[index]; }
   const T &operator[](size_t index) const noexcept { return data_[index]; }
+
+  T &front() noexcept { return data_[0]; }
+  const T &front() const noexcept { return data_[0]; }
+  T &back() noexcept { return data_[size_ - 1]; }
+  const T &back() const noexcept { return data_[size_ - 1]; }
+  T *data() noexcept { return data_; }
+  const T *data() const noexcept { return data_; }
+
+  using iterator = T *;
+  using const_iterator = const T *;
+  // Iterator support
+  iterator begin() noexcept { return data_; }
+  const_iterator begin() const noexcept { return data_; }
+  iterator end() noexcept { return data_ + size_; }
+  const_iterator end() const noexcept { return data_ + size_; }
+
+  void clear() noexcept {
+    for (size_t i = 0; i < size_; ++i) data_[i].~T();
+    size_ = 0;
+  }
 
  private:
   void reallocate(size_t new_capacity) {

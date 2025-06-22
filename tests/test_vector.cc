@@ -1,7 +1,8 @@
 #define CATCH_CONFIG_MAIN
-#include "stl/vector.h"
 #include <catch2/catch_test_macros.hpp>
 #include <string>
+
+#include "stl/vector.h"
 
 using stl::Vector;
 
@@ -13,8 +14,7 @@ struct MoveOnly {
   MoveOnly(MoveOnly &&other) noexcept { other.moved = true; }
   MoveOnly &operator=(const MoveOnly &) = delete;
   MoveOnly &operator=(MoveOnly &&other) noexcept {
-    if (this != &other)
-      other.moved = true;
+    if (this != &other) other.moved = true;
     return *this;
   }
 };

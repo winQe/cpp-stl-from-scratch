@@ -7,13 +7,13 @@
 
 #include <cstddef>
 #include <cstdlib>
-#include <iterator>
 #include <utility>
 
 namespace stl {
 
-template <typename T> class Vector {
-public:
+template <typename T>
+class Vector {
+ public:
   Vector(size_t capacity = 0) : capacity_(capacity) {
     if (capacity_ == 0) {
       data_ = nullptr;
@@ -24,17 +24,17 @@ public:
 
   // RAII
   ~Vector() noexcept {
-    for (size_t i = 0; i < size_; ++i)
-      data_[i].~T();
+    for (size_t i = 0; i < size_; ++i) data_[i].~T();
     free(data_);
   }
 
-  size_t size() const noexcept { return size_; }
-  size_t capacity() const noexcept { return capacity_; }
+  [[nodiscard]] size_t size() const noexcept { return size_; }
+  [[nodiscard]] size_t capacity() const noexcept { return capacity_; }
 
   // Forwarding reference to ensure our implementation accepts all value
   // categories
-  template <typename U> void push_back(U &&element) {
+  template <typename U>
+  void push_back(U &&element) {
     // Classic dynamic resizing array implementation
     // Exceed capacity, then just allocate twice as much
     if (size_ == capacity_) {
@@ -47,8 +47,7 @@ public:
   }
 
   void pop_back() {
-    if (size_ == 0)
-      return;
+    if (size_ == 0) return;
     // Destruct last element
     data_[size_ - 1].~T();
     size_--;
@@ -62,7 +61,7 @@ public:
   T &operator[](size_t index) noexcept { return data_[index]; }
   const T &operator[](size_t index) const noexcept { return data_[index]; }
 
-private:
+ private:
   void reallocate(size_t new_capacity) {
     // Allocate new memory
     T *new_data = static_cast<T *>(malloc(sizeof(T) * new_capacity));
@@ -89,4 +88,4 @@ private:
   size_t size_ = 0;
   size_t capacity_ = 0;
 };
-} // namespace stl
+}  // namespace stl

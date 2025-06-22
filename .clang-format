@@ -1,0 +1,5 @@
+---
+BasedOnStyle: Google
+CommentPragmas: ^ NOLINT
+Cpp11BracedListStyle: 'true'
+Standard: Cpp20

@@ -34,7 +34,13 @@ class Vector {
       : data_(static_cast<T *>(malloc(sizeof(T) * other.capacity_))),
         capacity_(other.capacity_),
         size_(other.size_) {
-    std::copy(other.data_, other.data_ + size_, data_);
+    // std::copy doesn't work for non-trivial types like vector, it will try to
+    // call copy assignment operator on objects not yet constructed
+
+    // for each element, invoke the copy‐constructor
+    for (size_t i = 0; i < size_; ++i) {
+      new (data_ + i) T(other.data_[i]);
+    }
   }
 
   void swap(Vector &other) noexcept {

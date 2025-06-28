@@ -16,6 +16,10 @@ FetchContent_Declare(
 
 FetchContent_MakeAvailable(Catch2)
 
+list(APPEND CMAKE_MODULE_PATH ${catch2_SOURCE_DIR}/extras)
+include(CTest)
+include(Catch)
+
 # Core library
 file(GLOB_RECURSE STLLIB_SOURCES
     src/*.cc
@@ -34,6 +38,7 @@ enable_testing()
 
 add_executable(run_tests
   tests/test_vector.cc
+  tests/test_unique_ptr.cc
 )
 
 target_link_libraries(run_tests
@@ -41,5 +46,4 @@ target_link_libraries(run_tests
     stl_from_scratch   
     Catch2::Catch2WithMain
 )
-
-add_test(NAME vector_tests COMMAND run_tests)
+catch_discover_tests(run_tests)

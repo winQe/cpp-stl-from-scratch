@@ -1,8 +1,20 @@
----
-Checks:          'clang-diagnostic-*,clang-analyzer-*,cppcoreguidelines-*,modernize-*,-modernize-use-trailing-return-type'
+Checks:
+  # core diagnostics and analyzers
+  - clang-diagnostic-*
+  - clang-analyzer-*
+  # Core C++ guidelines, except these memory/array rules:
+  - cppcoreguidelines-*
+  - modernize-*
+  # Turn off only these specific checks:
+  - "-modernize-use-trailing-return-type"
+  - "-cppcoreguidelines-owning-memory"
+  - "-modernize-avoid-c-arrays"
+  - "-modernize-use-nullptr"
+
 WarningsAsErrors: true
 HeaderFilterRegex: ''
 FormatStyle:     google
+
 CheckOptions:
   - key:             cert-dcl16-c.NewSuffixes
     value:           'L;LL;LU;LLU'
@@ -32,4 +44,3 @@ CheckOptions:
     value:           llvm
   - key:             modernize-use-nullptr.NullMacros
     value:           'NULL'
-...

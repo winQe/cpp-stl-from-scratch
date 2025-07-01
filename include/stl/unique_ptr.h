@@ -3,9 +3,10 @@
  * @brief Implementation of unique ptr
  */
 
+#pragma once
+#include <type_traits>
 #include <utility>
 
-#pragma once
 namespace stl {
 
 template <typename T>
@@ -53,6 +54,7 @@ class UniquePtr {
 
   // Template move constructor for compatible types
   template <typename U, typename D>
+    requires std::is_convertible_v<U*, T*> && std::is_convertible_v<D, Deleter>
   UniquePtr(UniquePtr<U, D>&& other) noexcept
       : data_(other.release()), deleter_(std::move(other.get_deleter())) {}
 
@@ -61,20 +63,15 @@ class UniquePtr {
   UniquePtr(const UniquePtr& other) = delete;
   UniquePtr& operator=(const UniquePtr& other) = delete;
 
-  UniquePtr(UniquePtr&& other) noexcept : data_(other.data_) {
-    other.data_ = nullptr;
-  }
+  UniquePtr(UniquePtr&& o) noexcept(
+      std::is_nothrow_move_constructible_v<Deleter>)
+      : data_{o.release()}, deleter_{std::move(o.deleter_)} {}
 
   UniquePtr& operator=(UniquePtr&& other) noexcept {
     if (this != &other) {
       // Clean up current resource
-      if (data_) {
-        deleter_(data_);
-      }
-
-      data_ = other.data_;
+      reset(other.release());
       deleter_ = std::move(other.deleter_);
-      other.data_ = nullptr;
     }
     return *this;
   }
@@ -89,6 +86,11 @@ class UniquePtr {
   const T* operator->() const noexcept { return data_; }
 
   void reset(T* raw_ptr = nullptr) noexcept {
+    // Guarding against the case where self reset
+    if (data_ == raw_ptr) {
+      return;
+    }
+
     if (data_) {
       deleter_(data_);
     }
@@ -103,8 +105,23 @@ class UniquePtr {
 
   explicit operator bool() const noexcept { return data_; }
 
+  void swap(UniquePtr& other) noexcept {
+    using std::swap;
+    swap(data_, other.data_);
+    swap(deleter_, other.deleter_);
+  }
+  Deleter& get_deleter() noexcept { return deleter_; }
+  const Deleter& get_deleter() const noexcept { return deleter_; }
+
  private:
   T* data_;
   Deleter deleter_;
 };
+
+// Perfect forwarding
+template <typename T, typename... Args>
+  requires std::constructible_from<T, Args&&...>
+UniquePtr<T> make_unique(Args&&... args) {
+  return UniquePtr<T>(new T(std::forward<Args>(args)...));
+}
 }  // namespace stl

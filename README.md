@@ -18,8 +18,8 @@ The goal is to learn some modern C++ features and idioms such as:
 | Component        | Status      | Key Features                                              |
 |------------------|-------------|-----------------------------------------------------------|
 | `Vector`         | ✅ Done     | Manual memory management, iterators, dynamic array       |
-| `HashMap`        | 🚧 WIP      | Open addressing, probing, custom hash                    |
-| `UniquePtr`      | 🧠 Planned  | Move-only semantics, custom deleters                     |
+| `HashMap`        | 🧠 Planned  | Open addressing, probing, custom hash                    |
+| `UniquePtr`      | ✅ Done     | Move-only semantics, custom deleters                     |
 | `SharedPtr`      | 🧠 Planned  | Reference counting, weak references, thread safety       |
 | `String`         | 🧠 Planned  | Small string optimization (SSO), move semantics          |
 | `LockFreeQueue`  | 🧠 Planned  | Lock-free concurrent queue, memory ordering              |

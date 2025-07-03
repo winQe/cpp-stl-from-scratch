@@ -23,7 +23,7 @@ The goal is to learn some modern C++ features and idioms such as:
 | `SharedPtr`      | 🧠 Planned  | Reference counting, weak references, thread safety       |
 | `String`         | 🧠 Planned  | Small string optimization (SSO), move semantics          |
 | `LockFreeQueue`  | 🧠 Planned  | Lock-free concurrent queue, memory ordering              |
-| `ThreadPool`     | 🧠 Planned  | Work stealing, task scheduling, future/promise           |
+| `ThreadPool`     | ✅ Done     | jthread, future/promise, packaged_task, condvars         |
 | `MemoryPool`     | 🧠 Planned  | Pool allocator, fixed-size blocks, fast allocation       |
 
 ---
@@ -43,7 +43,7 @@ The goal is to learn some modern C++ features and idioms such as:
 
 ### Concurrency & Performance
 - **Lock-Free Programming**: Wait-free queue implementation with memory ordering
-- **Thread Pool**: Work stealing scheduler, task queues, future/promise
+- **Thread Pool**: task queues, future/promise, jthreads, condvard
 - **Memory Ordering**: Sequential consistency, acquire-release semantics
 - **Cache-Friendly Design**: Minimize false sharing, optimize memory layout
 ---

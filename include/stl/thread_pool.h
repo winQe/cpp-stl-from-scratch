@@ -14,6 +14,7 @@
 #include <stop_token>
 #include <thread>
 #include <type_traits>
+#include <utility>
 #include <vector>
 
 namespace stl {
@@ -22,26 +23,47 @@ class ThreadPool {
   ThreadPool(size_t num_threads) {
     thread_workers_.reserve(num_threads);
 
-    for (int i = 0; i < num_threads; i++) {
-      thread_workers_.emplace_back(&ThreadPool::worker, this);
+    for (size_t i = 0; i < num_threads; i++) {
+      thread_workers_.emplace_back(
+          [this](std::stop_token stop_token) { this->worker(stop_token); });
     }
   }
 
   template <typename F, typename... Args>
-  auto submit_task(F&& f, Args args)
-      -> std::future<std::invoke_result<F, Args...>> {
-    std::scoped_lock lock(mutex_);
+  auto submit_task(F&& f, Args&&... args) -> std::future<
+      std::invoke_result_t<std::decay_t<F>, std::decay_t<Args>...>> {
+    using return_type =
+        std::invoke_result_t<std::decay_t<F>, std::decay_t<Args>...>;
 
-    // TODO: fix this with perfect forwarding
-    auto task = std::bind(f, args);
-    task_queue_.push(std::move(task));
+    // Create a packaged_task to get the future
+    // Perfect forwarding
+    auto task = std::make_shared<std::packaged_task<return_type()>>(
+        [f = std::forward<F>(f), args = std::make_tuple(std::forward<Args>(
+                                     args)...)]() mutable -> return_type {
+          return std::apply(f, std::move(args));
+        });
+
+    auto future = task->get_future();
+
+    {
+      std::scoped_lock lock(mutex_);
+      if (is_shutdown_.load(std::memory_order_relaxed)) {
+        // If shutdown, return an invalid future or throw
+        std::promise<return_type> promise;
+        promise.set_exception(std::make_exception_ptr(
+            std::runtime_error("ThreadPool is shut down")));
+        return promise.get_future();
+      }
+      task_queue_.emplace([task]() { (*task)(); });
+    }
 
     cv_.notify_one();
-    // TODO: return here
+    return future;
   }
 
   void shutdown() {
     is_shutdown_.store(true, std::memory_order_relaxed);
+    cv_.notify_all();
     for (auto& thread : thread_workers_) {
       thread.request_stop();
     }
@@ -61,22 +83,35 @@ class ThreadPool {
 
   void worker(std::stop_token stop_token) {
     while (!stop_token.stop_requested()) {
-      std::unique_lock<std::mutex> lock(mutex_);
-      cv_.wait(lock, [&]() {
-        return !task_queue_.empty() ||
-               is_shutdown_.load(std::memory_order_relaxed);
-      });
+      std::function<void()> task;
 
-      // Check if shutting down already
-      if (is_shutdown_.load(std::memory_order_relaxed)) {
-        return;
+      {
+        std::unique_lock<std::mutex> lock(mutex_);
+        cv_.wait(lock, [&]() {
+          return !task_queue_.empty() ||
+                 is_shutdown_.load(std::memory_order_relaxed) ||
+                 stop_token.stop_requested();
+        });
+
+        // Check if we should exit
+        if (stop_token.stop_requested() ||
+            (is_shutdown_.load(std::memory_order_relaxed) &&
+             task_queue_.empty())) {
+          return;
+        }
+
+        // If we have tasks, get one
+        if (!task_queue_.empty()) {
+          task = std::move(task_queue_.front());
+          task_queue_.pop();
+        } else {
+          continue;
+        }
+      }  // unlocked
+
+      if (task) {
+        task();
       }
-
-      auto task = task_queue_.front();
-      task_queue_.pop();
-      lock.unlock();
-
-      task();
     }
   }
 };

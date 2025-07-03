@@ -39,6 +39,7 @@ enable_testing()
 add_executable(run_tests
   tests/test_vector.cc
   tests/test_unique_ptr.cc
+  tests/test_thread_pool.cc
 )
 
 target_link_libraries(run_tests

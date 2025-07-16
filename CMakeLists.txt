@@ -36,15 +36,17 @@ target_include_directories(stl_from_scratch
 # Tests
 enable_testing()
 
-add_executable(run_tests
-  tests/test_vector.cc
-  tests/test_unique_ptr.cc
-  tests/test_thread_pool.cc
-)
+function(add_stl_test test_name)
+  add_executable(${test_name} tests/${test_name}.cc)
+  target_link_libraries(${test_name}
+    PRIVATE
+      stl_from_scratch
+      Catch2::Catch2WithMain
+  )
+  catch_discover_tests(${test_name})
+endfunction()
 
-target_link_libraries(run_tests
-  PRIVATE
-    stl_from_scratch   
-    Catch2::Catch2WithMain
-)
-catch_discover_tests(run_tests)
+add_stl_test(test_vector)
+add_stl_test(test_unique_ptr)
+add_stl_test(test_thread_pool)
+add_stl_test(test_lock_free_queue)

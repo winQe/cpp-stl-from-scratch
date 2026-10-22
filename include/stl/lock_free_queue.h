@@ -1,7 +1,10 @@
 /**
  * @file lock_free_queue.h
- * @brief Implementation of MPMC ring buffer based lock freee queue (Bounded
+ * @brief Implementation of MPMC ring buffer based lock free queue (Bounded
  * Vyukov Queue)
+ *
+ * T must be default-constructible and move-assignable, since every cell holds
+ * a T and values get assigned into it.
  */
 
 #pragma once
@@ -10,30 +13,41 @@
 #include <atomic>
 #include <concepts>
 #include <cstddef>
+#include <cstdint>
+#include <type_traits>
 #include <utility>
 
-constexpr uint kCacheLineSize = 64;
-
 namespace stl {
-template <typename T, size_t Capacity>
+
+// Not using std::hardware_destructive_interference_size, it varies by
+// compiler (Apple clang gives 256 on arm64)
+inline constexpr std::size_t kCacheLineSize = 64;
+
+template <typename T, std::size_t Capacity>
 class LockFreeQueue {
+  static_assert(Capacity > 0 && (Capacity & (Capacity - 1)) == 0,
+                "Capacity must be a power of 2");
+  static_assert(std::is_default_constructible_v<T>,
+                "T must be default-constructible (cells hold a T)");
+  static_assert(std::is_move_assignable_v<T>,
+                "T must be move-assignable (values are assigned into cells)");
+
   // Performance reasons -> modulo operation compiles to a single AND operation
-  static_assert((Capacity & (Capacity - 1)) == 0,
-                "Capacity must be power of 2");
-  static constexpr size_t MASK = Capacity - 1;
+  static constexpr std::size_t MASK = Capacity - 1;
 
  private:
+  // One cache line per cell to avoid false sharing
   struct alignas(kCacheLineSize) Cell {
-    std::atomic<size_t> seq;
+    std::atomic<std::size_t> seq;
     T data;
   };
   alignas(kCacheLineSize) std::array<Cell, Capacity> buffer_;
-  alignas(kCacheLineSize) std::atomic<size_t> enqueue_index_ = 0;
-  alignas(kCacheLineSize) std::atomic<size_t> dequeue_index_ = 0;
+  alignas(kCacheLineSize) std::atomic<std::size_t> enqueue_index_ = 0;
+  alignas(kCacheLineSize) std::atomic<std::size_t> dequeue_index_ = 0;
 
  public:
   LockFreeQueue() {
-    for (size_t i = 0; i < Capacity; i++) {
+    for (std::size_t i = 0; i < Capacity; i++) {
       buffer_[i].seq.store(i, std::memory_order_relaxed);
     }
   }
@@ -44,16 +58,17 @@ class LockFreeQueue {
   bool try_push(U&& item) {
     Cell* cell = nullptr;
 
-    size_t current_pos = enqueue_index_.load(std::memory_order_relaxed);
+    std::size_t current_pos = enqueue_index_.load(std::memory_order_relaxed);
 
     for (;;) {
       cell = &buffer_[current_pos & MASK];
-      size_t seq = cell->seq.load(std::memory_order_acquire);
+      std::size_t seq = cell->seq.load(std::memory_order_acquire);
 
-      intptr_t diff = (intptr_t)seq - (intptr_t)(current_pos);
+      auto diff = static_cast<std::intptr_t>(seq - current_pos);
 
       // Cell ready for writing, no contention
       if (diff == 0) {
+        // Relaxed is fine, seq does the synchronization
         if (enqueue_index_.compare_exchange_weak(current_pos, current_pos + 1,
                                                  std::memory_order_relaxed)) {
           // Claim the current pos and can write data here
@@ -62,7 +77,7 @@ class LockFreeQueue {
       } else if (diff < 0) {
         // Buffer full, seq is behind position
         return false;
-      } else {  // dif > 0: Another thread is working on this cell
+      } else {  // diff > 0: Another thread is working on this cell
         // Reload position and try again
         current_pos = enqueue_index_.load(std::memory_order_relaxed);
       }
@@ -79,13 +94,13 @@ class LockFreeQueue {
   bool try_pop(T& item) {
     Cell* cell = nullptr;
 
-    size_t current_pos = dequeue_index_.load(std::memory_order_relaxed);
+    std::size_t current_pos = dequeue_index_.load(std::memory_order_relaxed);
 
     for (;;) {
       cell = &buffer_[current_pos & MASK];
-      size_t seq = cell->seq.load(std::memory_order_acquire);
+      std::size_t seq = cell->seq.load(std::memory_order_acquire);
 
-      intptr_t diff = (intptr_t)seq - (intptr_t)(current_pos + 1);
+      auto diff = static_cast<std::intptr_t>(seq - (current_pos + 1));
 
       if (diff == 0) {
         // Ready to be read

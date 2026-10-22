@@ -4,6 +4,7 @@
 #include <catch2/catch_test_macros.hpp>
 #include <chrono>
 #include <memory>
+#include <mutex>
 #include <random>
 #include <set>
 #include <string>
@@ -376,11 +377,11 @@ TEST_CASE("LockFreeQueue concurrent operations") {
 
         for (size_t i = 0; i < STRESS_ITEMS / STRESS_THREADS; ++i) {
           if (dist(rng) == 0) {  // Try to push
+            // Don't spin, all threads could get stuck on a full queue
             size_t value = t * (STRESS_ITEMS / STRESS_THREADS) + i;
-            while (!stress_queue.try_push(value)) {
-              std::this_thread::yield();
+            if (stress_queue.try_push(value)) {
+              push_count++;
             }
-            push_count++;
           } else {  // Try to pop
             size_t value;
             if (stress_queue.try_pop(value)) {
@@ -416,7 +417,6 @@ TEST_CASE("LockFreeQueue producer-consumer patterns") {
     constexpr size_t ITEMS = 10000;
     stl::LockFreeQueue<size_t, 512> queue;
 
-    std::atomic<bool> producer_done{false};
     std::vector<size_t> consumed;
 
     std::thread producer([&]() {
@@ -425,12 +425,11 @@ TEST_CASE("LockFreeQueue producer-consumer patterns") {
           std::this_thread::yield();
         }
       }
-      producer_done = true;
     });
 
     std::thread consumer([&]() {
       size_t value;
-      while (!producer_done.load() || queue.try_pop(value)) {
+      while (consumed.size() < ITEMS) {
         if (queue.try_pop(value)) {
           consumed.push_back(value);
         } else {
@@ -502,7 +501,6 @@ TEST_CASE("LockFreeQueue memory ordering verification") {
     stl::LockFreeQueue<std::pair<int, int>, 64> queue;
 
     std::atomic<int> shared_counter{0};
-    std::atomic<bool> done{false};
     std::vector<std::pair<int, int>> results;
     std::mutex results_mutex;
 
@@ -515,12 +513,11 @@ TEST_CASE("LockFreeQueue memory ordering verification") {
           std::this_thread::yield();
         }
       }
-      done = true;
     });
 
     std::thread consumer([&]() {
       std::pair<int, int> value;
-      while (!done.load() || queue.try_pop(value)) {
+      while (results.size() < ITERATIONS) {
         if (queue.try_pop(value)) {
           std::lock_guard<std::mutex> lock(results_mutex);
           results.push_back(value);

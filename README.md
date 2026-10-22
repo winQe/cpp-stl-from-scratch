@@ -22,7 +22,7 @@ The goal is to learn some modern C++ features and idioms such as:
 | `UniquePtr`      | ✅ Done     | Move-only semantics, custom deleters                     |
 | `SharedPtr`      | 🧠 Planned  | Reference counting, weak references, thread safety       |
 | `String`         | 🧠 Planned  | Small string optimization (SSO), move semantics          |
-| `LockFreeQueue`  | 🧠 Planned  | MPMC Vyukov Queue, memory ordering                       |
+| `LockFreeQueue`  | ✅ Done     | MPMC Vyukov Queue, memory ordering                       |
 | `ThreadPool`     | ✅ Done     | jthread, future/promise, packaged_task, condvars         |
 | `MemoryPool`     | 🧠 Planned  | Pool allocator, fixed-size blocks, fast allocation       |
 

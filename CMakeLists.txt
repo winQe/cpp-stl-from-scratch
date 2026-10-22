@@ -5,6 +5,13 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
+# e.g. -DSTL_SANITIZE=address,undefined or -DSTL_SANITIZE=thread
+set(STL_SANITIZE "" CACHE STRING "Comma-separated list of sanitizers to enable")
+if(STL_SANITIZE)
+  add_compile_options(-fsanitize=${STL_SANITIZE} -fno-omit-frame-pointer -fno-sanitize-recover=all)
+  add_link_options(-fsanitize=${STL_SANITIZE})
+endif()
+
 # Catch2
 Include(FetchContent)
 
@@ -43,7 +50,8 @@ function(add_stl_test test_name)
       stl_from_scratch
       Catch2::Catch2WithMain
   )
-  catch_discover_tests(${test_name})
+  # Fail on deadlock instead of hanging
+  catch_discover_tests(${test_name} PROPERTIES TIMEOUT 300)
 endfunction()
 
 add_stl_test(test_vector)

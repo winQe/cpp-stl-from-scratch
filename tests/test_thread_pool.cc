@@ -1,7 +1,12 @@
 #define CATCH_CONFIG_MAIN
+#include <algorithm>
 #include <atomic>
 #include <catch2/catch_test_macros.hpp>
 #include <chrono>
+#include <exception>
+#include <future>
+#include <memory>
+#include <stdexcept>
 #include <thread>
 #include <vector>
 
@@ -141,13 +146,116 @@ TEST_CASE("ThreadPool shutdown") {
 
       // Let some tasks start
       std::this_thread::sleep_for(std::chrono::milliseconds(25));
-    }  // Destructor should be called here
+    }
 
-    // Give a moment for cleanup
-    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    REQUIRE(counter.get() == 5);
+  }
 
-    // At least some tasks should have completed
-    REQUIRE(counter.get() >= 0);
+  SECTION("Shutdown drains queued tasks") {
+    constexpr int kTasks = 100;
+    stl::ThreadPool pool(2);
+    Counter counter;
+    std::vector<std::future<void>> futures;
+
+    // Keep both workers busy so the rest stay queued
+    for (int i = 0; i < 2; ++i) {
+      futures.push_back(pool.submit_task([]() {
+        std::this_thread::sleep_for(std::chrono::milliseconds(50));
+      }));
+    }
+    for (int i = 0; i < kTasks; ++i) {
+      futures.push_back(pool.submit_task([&counter]() { counter.increment(); }));
+    }
+
+    pool.shutdown();
+
+    REQUIRE(counter.get() == kTasks);
+    for (auto& future : futures) {
+      REQUIRE(future.wait_for(std::chrono::seconds(0)) ==
+              std::future_status::ready);
+      REQUIRE_NOTHROW(future.get());
+    }
+  }
+
+  SECTION("Submit after shutdown is rejected") {
+    stl::ThreadPool pool(2);
+    pool.shutdown();
+
+    auto future = pool.submit_task([]() { return 1; });
+    REQUIRE_THROWS_AS(future.get(), std::runtime_error);
+  }
+
+  SECTION("Shutdown is idempotent") {
+    stl::ThreadPool pool(2);
+    pool.shutdown();
+    REQUIRE_NOTHROW(pool.shutdown());
+  }
+}
+
+// Lost wakeup on shutdown used to hang the destructor
+TEST_CASE("ThreadPool create/destroy stress") {
+  constexpr auto kTimeout = std::chrono::seconds(60);
+
+  auto run_with_timeout = [&](auto body) {
+    std::promise<void> done;
+    auto finished = done.get_future();
+    std::thread runner([body, done = std::move(done)]() mutable {
+      try {
+        body();
+        done.set_value();
+      } catch (...) {
+        done.set_exception(std::current_exception());
+      }
+    });
+    if (finished.wait_for(kTimeout) == std::future_status::timeout) {
+      runner.detach();
+      FAIL("ThreadPool create/destroy loop did not finish (shutdown hang)");
+    }
+    runner.join();
+    finished.get();
+  };
+
+  SECTION("Empty pools") {
+    run_with_timeout([]() {
+      for (int i = 0; i < 2000; ++i) {
+        stl::ThreadPool pool(4);
+      }
+    });
+  }
+
+  SECTION("Pools with queued tasks") {
+    auto executed = std::make_shared<std::atomic<int>>(0);
+    constexpr int kIterations = 500;
+    constexpr int kTasksPerPool = 8;
+
+    run_with_timeout([executed]() {
+      for (int i = 0; i < kIterations; ++i) {
+        stl::ThreadPool pool(4);
+        for (int j = 0; j < kTasksPerPool; ++j) {
+          pool.submit_task([executed]() { executed->fetch_add(1); });
+        }
+      }
+    });
+
+    REQUIRE(executed->load() == kIterations * kTasksPerPool);
+  }
+
+  SECTION("Explicit shutdown with queued tasks") {
+    run_with_timeout([]() {
+      for (int i = 0; i < 500; ++i) {
+        stl::ThreadPool pool(4);
+        std::vector<std::future<int>> futures;
+        for (int j = 0; j < 8; ++j) {
+          futures.push_back(pool.submit_task([j]() { return j; }));
+        }
+        pool.shutdown();
+        for (int j = 0; j < 8; ++j) {
+          if (futures[j].get() != j) {
+            throw std::logic_error("wrong result after shutdown");
+          }
+        }
+      }
+    });
   }
 }
 

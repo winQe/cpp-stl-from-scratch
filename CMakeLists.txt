@@ -43,7 +43,8 @@ function(add_stl_test test_name)
       stl_from_scratch
       Catch2::Catch2WithMain
   )
-  catch_discover_tests(${test_name})
+  # Fail on deadlock instead of hanging
+  catch_discover_tests(${test_name} PROPERTIES TIMEOUT 300)
 endfunction()
 
 add_stl_test(test_vector)
